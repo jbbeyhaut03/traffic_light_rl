@@ -14,11 +14,19 @@ from src.traffic_light_env import TrafficLightEnv
 class RewardCallback(BaseCallback):
     def __init__(self, check_freq: int, save_path: str):
         super().__init__()
-        self.check_freq = check_freq
-        self.save_path = save_path
-        self.rewards = []
+        self.check_freq = check_freq    # How often to update the reward curve.
+        self.save_path = save_path      # Where to save the plot image.
+        self.rewards = []               # For reward curve plotting.
+        self.all_rewards = []           # NEW: To store individual episode rewards.
+
 
     def _on_step(self) -> bool:
+        # Record every reward from the rollout into all_rewards.
+        if "rewards" in self.locals:
+            # Convert numpy array to list and extend all_rewards.
+            self.all_rewards.extend(self.locals["rewards"].tolist())
+        
+        # Existing code: update the reward curve every check_freq steps.
         if self.n_calls % self.check_freq == 0:
             episode_rewards = self.locals["rewards"]
             if episode_rewards:
@@ -31,6 +39,7 @@ class RewardCallback(BaseCallback):
             plt.legend()
             plt.savefig(os.path.join(self.save_path, "reward_curve.png"))
         return True
+
 
 # Instantiate the environment.
 env = TrafficLightEnv()
@@ -66,6 +75,18 @@ for lr in learning_rates:
     
     # Train the model.
     model.learn(total_timesteps=timesteps, callback=callback)
+
+    # After training for this learning rate is complete, plot a histogram of the last 100 episode rewards.
+    # If there are at least 100 rewards, take the last 100; otherwise, use all available rewards.
+    rewards_to_plot = callback.all_rewards[-100:] if len(callback.all_rewards) >= 100 else callback.all_rewards
+
+    plt.figure()
+    plt.hist(rewards_to_plot, bins=20)
+    plt.xlabel("Reward")
+    plt.ylabel("Frequency")
+    plt.title("Histogram of Episode Rewards for LR {}".format(lr))
+    plt.savefig(os.path.join(lr_save_path, "reward_histogram.png"))
+    plt.close()
     
     # Save the trained model.
     model.save(f"results/ppo/ppo_lr_{lr}")

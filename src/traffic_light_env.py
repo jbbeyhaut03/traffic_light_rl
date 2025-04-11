@@ -77,11 +77,23 @@ class TrafficLightEnv(gym.Env):
         self.state = np.append(new_queues, light).astype(np.float32)
         
         # Reward
-        reward = -sum(new_queues)  # -1 per waiting vehicle
-        if sum(new_queues) == 0:
-            reward += 10  # Bonus for clearing all queues
+        # Calculate total number of waiting vehicles.
+        total_queue = sum(new_queues)
+
+        # Normalize the queue penalty.
+        # Here, self.max_queue is 20 and there are 4 directions, so the maximum total queue is 80.
+        # Dividing the total queue by 80 gives a normalized penalty between 0 and -1.
+        reward = - total_queue / (self.max_queue * 4)
+
+        # Provide a bonus when the total queue is very low.
+        # Instead of a bonus only when all queues are zero, we now add a bonus when total_queue is less than a threshold, e.g., 5 vehicles.
+        if total_queue < 5:
+            reward += 2  # Smaller, more frequent positive reinforcement
+
+        # Lower the penalty for switching the light.
+        # Change from -5 to -1 (you could try -0.5 if you’d like it even milder).
         if action == 1 and self.last_light != light:
-            reward -= 5  # Penalty for switching
+            reward -= 1
         # Justification: Negative reward incentivizes short queues; bonus rewards goal; penalty discourages frequent switches.
         
         self.last_light = light
@@ -128,4 +140,4 @@ if __name__ == "__main__":
         if terminated or truncated:
             break
     plt.show()  # Keep window open at end
-    env.close()
+    env.close() 
