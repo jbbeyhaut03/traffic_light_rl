@@ -97,6 +97,7 @@ class TrafficLightEnv(gym.Env):
     def render(self):
         if len(self.history) == 0:
             return
+        plt.ion()  # Turn on interactive mode
         queues = np.array(self.history)
         plt.clf()
         plt.plot(queues[:, 0], label="North")
@@ -107,6 +108,7 @@ class TrafficLightEnv(gym.Env):
         plt.ylabel("Queue Length")
         plt.title("Traffic Queues Over Time")
         plt.legend()
+        plt.draw()
         plt.pause(0.01)
         # Justification: Visualizes queue dynamics, aids assessment and debugging.
 
@@ -122,6 +124,8 @@ if __name__ == "__main__":
         action = env.action_space.sample()
         state, reward, terminated, truncated, _ = env.step(action)
         env.render()
+        plt.pause(0.1)  # Slow down to see updates
         if terminated or truncated:
             break
+    plt.show()  # Keep window open at end
     env.close()
