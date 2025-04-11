@@ -8,25 +8,18 @@ class TrafficLightEnv(gym.Env):
         super().__init__()
         # State: [queue_N, queue_S, queue_E, queue_W, light_state (0=NS green, 1=EW green)]
         self.observation_space = spaces.Box(
-            low=np.array([0, 0, 0, 0, 0]), 
-            high=np.array([20, 20, 20, 20, 1]), 
+            low=np.array([0, 0, 0, 0, 0]),
+            high=np.array([20, 20, 20, 20, 1]),
             dtype=np.float32
         )
-        # Justification: Queue limits (0-20) balance realism and simplicity; light_state is binary (0 or 1).
-        
         # Action: 0 = keep current light, 1 = switch light
         self.action_space = spaces.Discrete(2)
-        # Justification: Discrete actions simplify control; "keep" vs. "switch" is intuitive for traffic lights.
         
         # Environment parameters
-        self.max_queue = 20  # Cap queue to avoid infinite growth
-        # Justification: Prevents state explosion, keeps environment manageable.
-        self.arrival_rate = 0.3  # Probability of vehicle arriving per direction per step
-        # Justification: Moderate rate simulates realistic traffic, allows queues to form/clear.
-        self.departure_rate = 3  # Vehicles cleared per green light per step
-        # Justification: Ensures green light has impact, balances reward dynamics.
-        self.max_steps = 200  # Episode length
-        # Justification: Long enough for learning, short enough for quick training.
+        self.max_queue = 20              # Cap queue to avoid infinite growth
+        self.arrival_rate = 0.3          # Probability of vehicle arriving per direction per step
+        self.departure_rate = 3          # Vehicles cleared per green light per step
+        self.max_steps = 200             # Episode length
         
         # State variables
         self.state = None
@@ -34,8 +27,7 @@ class TrafficLightEnv(gym.Env):
         self.last_light = None
         
         # Visualization
-        self.history = []  # Track queues for plotting
-        # Justification: Enables assessment of performance over time.
+        self.history = []              # Track queues for plotting
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
@@ -44,72 +36,74 @@ class TrafficLightEnv(gym.Env):
         self.step_count = 0
         self.last_light = 0
         self.history = []
-        # Justification: Random initial queues add variability; NS green as default is arbitrary but consistent.
         return self.state, {}
 
     def step(self, action):
-        queues, light = self.state[:-1], int(self.state[-1])
+        # Unpack state: queues for four directions and the current light state.
+        queues = self.state[:-1].copy()
+        current_light = int(self.state[-1])
+        initial_light = current_light  # For reference before action
+        
         self.step_count += 1
         
-        # Apply action: 0=keep, 1=switch
+        # --- Action handling: Switching the light ---
+        switched = False
         if action == 1:
-            light = 1 - light  # Toggle between 0 (NS green) and 1 (EW green)
-        # Justification: Simple toggle reflects traffic light mechanics.
+            current_light = 1 - current_light  # Toggle light (0 becomes 1, and vice versa)
+            switched = True
         
-        # Update queues
+        # --- Queue update: Arrivals ---
         new_queues = queues.copy()
-        # Arrivals (Poisson-like)
         for i in range(4):
-            new_queues[i] += np.random.binomial(1, self.arrival_rate)
+            arrivals = np.random.binomial(1, self.arrival_rate)
+            new_queues[i] += arrivals
             new_queues[i] = min(new_queues[i], self.max_queue)
-        # Justification: Binomial approximates vehicle arrivals; cap prevents overflow.
         
-        # Departures based on light
-        if light == 0:  # NS green, EW red
-            new_queues[0] = max(0, new_queues[0] - self.departure_rate)  # N
-            new_queues[1] = max(0, new_queues[1] - self.departure_rate)  # S
+        # --- Departures: Clear vehicles from the queue in directions with a green light ---
+        throughput = 0  # Count of vehicles cleared this step
+        if current_light == 0:  # NS green, EW red
+            served_indices = [0, 1]
         else:  # EW green, NS red
-            new_queues[2] = max(0, new_queues[2] - self.departure_rate)  # E
-            new_queues[3] = max(0, new_queues[3] - self.departure_rate)  # W
-        # Justification: Departure only on green directions; rate ensures progress.
+            served_indices = [2, 3]
         
-        # Update state
-        self.state = np.append(new_queues, light).astype(np.float32)
+        for i in served_indices:
+            # Determine how many vehicles can actually clear (cannot clear more than present)
+            cleared = min(new_queues[i], self.departure_rate)
+            throughput += cleared
+            new_queues[i] = new_queues[i] - cleared  # Update queue
         
-        # Reward
-        # Calculate total number of waiting vehicles.
+        # --- Update state ---
+        self.state = np.append(new_queues, current_light).astype(np.float32)
+        
+        # --- Reward Calculation ---
         total_queue = sum(new_queues)
-
-        # Normalize the queue penalty.
-        # Here, self.max_queue is 20 and there are 4 directions, so the maximum total queue is 80.
-        # Dividing the total queue by 80 gives a normalized penalty between 0 and -1.
         reward = - total_queue / (self.max_queue * 4)
-
-        # Provide a bonus when the total queue is very low.
-        # Instead of a bonus only when all queues are zero, we now add a bonus when total_queue is less than a threshold, e.g., 5 vehicles.
         if total_queue < 5:
-            reward += 2  # Smaller, more frequent positive reinforcement
-
-        # Lower the penalty for switching the light.
-        # Change from -5 to -1 (you could try -0.5 if you’d like it even milder).
-        if action == 1 and self.last_light != light:
-            reward -= 1
-        # Justification: Negative reward incentivizes short queues; bonus rewards goal; penalty discourages frequent switches.
+            reward += 2  # Bonus for very low total queue
         
-        self.last_light = light
+        # Penalize switching slightly if it actually changed the light status from previous step.
+        if action == 1 and self.last_light != current_light:
+            reward -= 1
+        
+        self.last_light = current_light
         self.history.append(new_queues.copy())
         
-        # Termination
+        # --- Termination ---
         terminated = self.step_count >= self.max_steps
         truncated = False
-        # Justification: Fixed episode length ensures training stability.
         
-        return self.state, reward, terminated, truncated, {}
+        # --- Additional Info ---
+        info = {
+            "throughput": throughput,    # Number of vehicles cleared during this step
+            "switched": int(switched)      # Whether the light switched: 1 for yes, 0 for no
+        }
+        
+        return self.state, reward, terminated, truncated, info
 
     def render(self):
         if len(self.history) == 0:
             return
-        plt.ion()  # Turn on interactive mode
+        plt.ion()  # Enable interactive mode
         queues = np.array(self.history)
         plt.clf()
         plt.plot(queues[:, 0], label="North")
@@ -122,11 +116,9 @@ class TrafficLightEnv(gym.Env):
         plt.legend()
         plt.draw()
         plt.pause(0.01)
-        # Justification: Visualizes queue dynamics, aids assessment and debugging.
 
     def close(self):
         plt.close()
-        # Justification: Ensures clean shutdown of visualization.
 
 # Test environment
 if __name__ == "__main__":
@@ -134,10 +126,11 @@ if __name__ == "__main__":
     env.reset()
     for _ in range(100):
         action = env.action_space.sample()
-        state, reward, terminated, truncated, _ = env.step(action)
+        state, reward, terminated, truncated, info = env.step(action)
+        print(f"Step info: throughput={info['throughput']}, switched={info['switched']}")
         env.render()
         plt.pause(0.1)  # Slow down to see updates
         if terminated or truncated:
             break
     plt.show()  # Keep window open at end
-    env.close() 
+    env.close()
