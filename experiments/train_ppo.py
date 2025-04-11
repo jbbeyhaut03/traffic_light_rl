@@ -19,14 +19,12 @@ class RewardCallback(BaseCallback):
         self.rewards = []               # For reward curve plotting.
         self.all_rewards = []           # NEW: To store individual episode rewards.
 
-
     def _on_step(self) -> bool:
         # Record every reward from the rollout into all_rewards.
         if "rewards" in self.locals:
-            # Convert numpy array to list and extend all_rewards.
             self.all_rewards.extend(self.locals["rewards"].tolist())
         
-        # Existing code: update the reward curve every check_freq steps.
+        # Update the reward curve every check_freq steps.
         if self.n_calls % self.check_freq == 0:
             episode_rewards = self.locals["rewards"]
             if episode_rewards:
@@ -40,7 +38,6 @@ class RewardCallback(BaseCallback):
             plt.savefig(os.path.join(self.save_path, "reward_curve.png"))
         return True
 
-
 # Instantiate the environment.
 env = TrafficLightEnv()
 # Check if the environment conforms to Gymnasium's API.
@@ -50,12 +47,13 @@ check_env(env)
 timesteps = 300_000
 learning_rates = [1e-4, 3e-4]
 
+# Ensure the base directory for PPO results exists.
 os.makedirs("results/ppo", exist_ok=True)
 
 for lr in learning_rates:
     print(f"Training PPO with learning rate: {lr}")
     # Create results directory for this learning rate.
-    lr_save_path = os.path.join("results/ppo", f"lr_{lr}")
+    lr_save_path = os.path.join("results", "ppo", f"lr_{lr}")
     os.makedirs(lr_save_path, exist_ok=True)
     
     # Initialize the PPO model.
@@ -76,20 +74,20 @@ for lr in learning_rates:
     # Train the model.
     model.learn(total_timesteps=timesteps, callback=callback)
 
-    # After training for this learning rate is complete, plot a histogram of the last 100 episode rewards.
-    # If there are at least 100 rewards, take the last 100; otherwise, use all available rewards.
+    # Plot a histogram of the last 100 episode rewards.
     rewards_to_plot = callback.all_rewards[-100:] if len(callback.all_rewards) >= 100 else callback.all_rewards
-
     plt.figure()
     plt.hist(rewards_to_plot, bins=20)
     plt.xlabel("Reward")
     plt.ylabel("Frequency")
-    plt.title("Histogram of Episode Rewards for LR {}".format(lr))
+    plt.title(f"Histogram of Episode Rewards for LR {lr}")
     plt.savefig(os.path.join(lr_save_path, "reward_histogram.png"))
     plt.close()
     
-    # Save the trained model.
-    model.save(f"results/ppo/ppo_lr_{lr}")
+    # Save the trained model as a zip file inside the learning rate folder.
+    model_path = os.path.join(lr_save_path, f"ppo_lr_{lr}.zip")
+    model.save(model_path)
+    print(f"Model saved to {model_path}")
 
 # Close the environment.
 env.close()
