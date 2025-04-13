@@ -40,7 +40,7 @@ def evaluate_model(model, num_episodes=50):
             obs, reward, terminated, truncated, info = env.step(action)
             ep_reward += reward
             # Sum of the queue lengths (first four elements of the observation).
-            ep_queue_sum += np.sum(obs[:-1])
+            ep_queue_sum += np.sum(obs[:4])
             # Update the maximum queue encountered in this episode.
             ep_max_queue = max(ep_max_queue, np.max(obs[:-1]))
             ep_steps += 1

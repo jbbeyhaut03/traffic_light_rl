@@ -1,5 +1,5 @@
 Custom PPO Evaluation Metrics
 ==================================================
 lr	AvgReward	AvgQueue	MaxQueue	AvgThroughput	AvgSwitchRate
-0.0001	203.80	1.60	2.00	1.40	0.53
-0.0002	222.90	2.35	2.00	1.41	0.20
+0.0001	203.80	1.16	2.00	1.40	0.53
+0.0002	222.90	1.93	2.00	1.41	0.20
