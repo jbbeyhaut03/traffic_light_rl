@@ -1,0 +1,5 @@
+PPO Evaluation Metrics
+==================================================
+lr	Reward	Queue	MaxQueue	Throughput	SwitchRate
+0.0001	190.31	0.93	3.40	1.23	0.370
+0.0002	191.14	1.75	4.16	1.22	0.187

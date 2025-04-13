@@ -77,13 +77,7 @@ class TrafficLightEnv(gym.Env):
         
         # --- Reward Calculation ---
         total_queue = sum(new_queues)
-        reward = - total_queue / (self.max_queue * 4)
-        if total_queue < 5:
-            reward += 2  # Bonus for very low total queue
-        
-        # Penalize switching slightly if it actually changed the light status from previous step.
-        if action == 1 and self.last_light != current_light:
-            reward -= 1
+        reward = -total_queue * 0.1 + 1.0 * throughput - 0.5 * int(switched)
         
         self.last_light = current_light
         self.history.append(new_queues.copy())
@@ -127,7 +121,7 @@ if __name__ == "__main__":
     for _ in range(100):
         action = env.action_space.sample()
         state, reward, terminated, truncated, info = env.step(action)
-        print(f"Step info: throughput={info['throughput']}, switched={info['switched']}")
+        print(f"Step info: throughput={info['throughput']}, switched={info['switched']}, reward={reward:.2f}")
         env.render()
         plt.pause(0.1)  # Slow down to see updates
         if terminated or truncated:
