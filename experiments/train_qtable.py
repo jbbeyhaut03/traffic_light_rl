@@ -15,15 +15,24 @@ from src.traffic_light_env import TrafficLightEnv
 # ------------------------------
 def discretize_state(obs):
     """
-    Convert the observation (a numpy array of floats) into a discrete tuple.
-    Observation format: [queue_N, queue_S, queue_E, queue_W, light_state]
+    Convert the observation into a discrete tuple.
+    Updated observation format:
+       [queue_N, queue_S, queue_E, queue_W, light_state, time_of_day]
+    We discretize the four queue values and the light state as before,
+    and discretize time_of_day into 4 bins.
     """
     q_n = int(round(obs[0]))
     q_s = int(round(obs[1]))
     q_e = int(round(obs[2]))
     q_w = int(round(obs[3]))
     light = int(round(obs[4]))
-    return (q_n, q_s, q_e, q_w, light)
+    
+    # Discretize time_of_day into 4 bins
+    time_bin = int(obs[5] * 4)
+    time_bin = min(time_bin, 3)
+    
+    return (q_n, q_s, q_e, q_w, light, time_bin)
+
 
 # ------------------------------
 # Q-learning Hyperparameters

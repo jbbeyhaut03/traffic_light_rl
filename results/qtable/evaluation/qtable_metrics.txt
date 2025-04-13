@@ -1,4 +1,4 @@
 Q-learning Evaluation Metrics
 ==================================================
 AvgReward	AvgQueue	MaxQueue	Throughput	SwitchRate
-183.87	1.74	4.24	1.24	0.286
+187.73	1.60	3.82	1.29	0.486

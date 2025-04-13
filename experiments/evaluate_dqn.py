@@ -32,7 +32,7 @@ def evaluate_model(model, env, num_episodes=50):
             action, _ = model.predict(obs, deterministic=True)
             obs, reward, terminated, truncated, info = env.step(action)
             ep_reward += reward
-            queues = obs[:-1]
+            queues = obs[:4]
             ep_queue_sum += np.sum(queues)
             ep_max_queue = max(ep_max_queue, np.max(queues))
             ep_throughput += info["throughput"]
